@@ -1,5 +1,8 @@
-import { LightningElement } from 'lwc';
+import { LightningElement,wire } from 'lwc';
 import {getFieldValue} from 'lightning/uiRecordApi'
+import {NavigationMixin} from 'lightning/navigation'
+
+import CAR_OBJECT from '@salesforce/schema/Car__c'
 
 import NAME_FIELD from '@salesforce/schema/Car__c.Name'
 import PICTURE_URL_FIELD from '@salesforce/schema/Car__c.Picture_URL__c'
@@ -10,7 +13,14 @@ import FUEL_FIELD from '@salesforce/schema/Car__c.Fuel_Type__c'
 import SEATS_FIELD from '@salesforce/schema/Car__c.Number_of_Seats__c'
 import CONTROL_FIELD from '@salesforce/schema/Car__c.Control__c'
 
-export default class CarCard extends LightningElement {
+import CAR_SELECTED_MESSAGE from '@salesforce/messageChannel/CarSelected__c'
+import { subscribe,MessageContext,unsubscribe } from 'lightning/messageService';
+
+export default class CarCard extends NavigationMixin(LightningElement) {
+
+    @wire(MessageContext)
+    messageContext
+
     categoryField = CATEGORY_FIELD
     makeField = MAKE_FIELD 
     msrpField = MSRP_FIELD
@@ -18,15 +28,44 @@ export default class CarCard extends LightningElement {
     seatsField = SEATS_FIELD
     controlField = CONTROL_FIELD
 
-    recordId = 'a009I00000CeBNeQAN'
+    recordId
 
     carName
     carPictureUrl
+
+    carSelectionSubscription
 
     handleRecordLoaded(event){
         const {records} = event.detail
         const recordData = records[this.recordId]
         this.carName = getFieldValue(recordData, NAME_FIELD)
         this.carPictureUrl = getFieldValue(recordData, PICTURE_URL_FIELD)
+    }
+
+    connectedCallback(){
+        this.subscribeHandler()
+    }
+
+    subscribeHandler(){
+        this.carSelectionSubscription = subscribe(this.messageContext,CAR_SELECTED_MESSAGE,(message)=>this.handleCarSelected(message))
+    }
+
+    handleCarSelected(message){
+        this.recordId = message.carId
+    }
+    
+    disconnectedCallback(){
+        unsubscribe(this.carSelectionSubscription)
+        this.carSelectionSubscription = null
+    }
+    handleNavigateToRecord(){
+        this[NavigationMixin.Navigate]({
+            type:'standard__recordPage',
+            attributes:{
+                recordId:this.recordId,
+                objectApiName:CAR_OBJECT.objectApiName,
+                actionName:'view'
+            }
+        })
     }
 }
